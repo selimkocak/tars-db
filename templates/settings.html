@@ -1,0 +1,81 @@
+<div class="analysis-container">
+    <div class="toolbar">
+        <a href="#hub" class="btn-back"><i class="fa-solid fa-arrow-left"></i> Hub'a Dön</a>
+        <h2 style="margin:0; margin-left:20px; font-size:1.2rem; color:#444;">⚙️ Motor Ayarları & Veri Bağlantıları</h2>
+    </div>
+
+    <div class="grid-charts" style="grid-template-columns: 1fr 1fr;">
+        
+        <div class="chart-box" style="height:auto;">
+            <h3 style="border-bottom:1px solid #eee; padding-bottom:10px;">🌍 Bölgesel Ayarlar (Localization)</h3>
+            
+            <div class="form-group">
+                <label>Binlik Ayracı (Thousand Sep)</label>
+                <input type="text" id="setThousand" value="." class="qlik-input">
+            </div>
+            <div class="form-group">
+                <label>Ondalık Ayracı (Decimal Sep)</label>
+                <input type="text" id="setDecimal" value="," class="qlik-input">
+            </div>
+            <div class="form-group">
+                <label>Tarih Formatı (Date Format)</label>
+                <select id="setDateFormat" class="qlik-input">
+                    <option value="DD.MM.YYYY">DD.MM.YYYY (21.11.2025)</option>
+                    <option value="MM/DD/YYYY">MM/DD/YYYY (11/21/2025)</option>
+                    <option value="YYYY-MM-DD">YYYY-MM-DD (2025-11-21)</option>
+                </select>
+            </div>
+            
+            <button id="btnSaveSettings" class="btn-qlik">Ayarları Kaydet</button>
+            <div id="settingsMsg" style="margin-top:10px; color:green; font-size:0.8rem;"></div>
+        </div>
+
+        <div class="chart-box" style="height:auto;">
+            <h3 style="border-bottom:1px solid #eee; padding-bottom:10px;">🔗 Veri Bağlantıları (Connections)</h3>
+            
+            <ul class="connection-list">
+                <li class="conn-item">
+                    <i class="fa-solid fa-file-excel" style="color:green"></i>
+                    <div>
+                        <strong>Excel / CSV Upload</strong>
+                        <div style="font-size:0.7rem; color:#999">Local File System</div>
+                    </div>
+                    <span class="badge-active">Aktif</span>
+                </li>
+                <li class="conn-item" style="opacity:0.5">
+                    <i class="fa-solid fa-database" style="color:#007bff"></i>
+                    <div>
+                        <strong>PostgreSQL / MySQL</strong>
+                        <div style="font-size:0.7rem; color:#999">ODBC Connector (Yakında)</div>
+                    </div>
+                    <span class="badge-passive">Pasif</span>
+                </li>
+                <li class="conn-item" style="opacity:0.5">
+                    <i class="fa-solid fa-cloud" style="color:#f39c12"></i>
+                    <div>
+                        <strong>REST API</strong>
+                        <div style="font-size:0.7rem; color:#999">JSON Data Source (Yakında)</div>
+                    </div>
+                    <span class="badge-passive">Pasif</span>
+                </li>
+            </ul>
+            
+            <button class="btn-qlik-outline">+ Yeni Bağlantı Oluştur</button>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-size: 0.8rem; color: #666; margin-bottom: 5px; font-weight: bold; }
+    .qlik-input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 2px; font-family: monospace; }
+    .btn-qlik { background: #65b84d; color: white; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; width: 100%; }
+    .btn-qlik:hover { background: #54a03e; }
+    .btn-qlik-outline { background: transparent; border: 2px dashed #ccc; color: #666; padding: 10px; width: 100%; cursor: pointer; margin-top: 15px; }
+    
+    .connection-list { list-style: none; padding: 0; margin: 0; }
+    .conn-item { display: flex; align-items: center; gap: 15px; padding: 10px; border-bottom: 1px solid #eee; }
+    .badge-active { background: #e3fcec; color: #1f7a38; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: auto; }
+    .badge-passive { background: #eee; color: #999; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: auto; }
+</style>

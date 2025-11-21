@@ -1,0 +1,25 @@
+<div class="analysis-container">
+    <div class="toolbar">
+        <a href="#hub" class="btn-back"><i class="fa-solid fa-arrow-left"></i> Hub'a Dön</a>
+        
+        <div id="dropZone" style="border: 2px dashed #ccc; padding: 10px 30px; cursor: pointer; text-align: center;">
+            <span style="color:#666">📂 Excel/CSV Sürükle & Bırak</span>
+            <input type="file" id="fileInput" accept=".csv, .xlsx" style="display:none">
+        </div>
+
+        <div style="text-align: right;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #333;" id="totalRows">0</div>
+            <div style="font-size: 0.7rem; color: #888;">KAYIT SAYISI</div>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+        <select id="sel1" style="flex:1; padding:10px;"><option>Sol Grafik...</option></select>
+        <select id="sel2" style="flex:1; padding:10px;"><option>Sağ Grafik...</option></select>
+    </div>
+
+    <div class="grid-charts">
+        <div class="chart-box"><canvas id="chart1"></canvas></div>
+        <div class="chart-box"><canvas id="chart2"></canvas></div>
+    </div>
+</div>

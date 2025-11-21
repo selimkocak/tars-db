@@ -1,0 +1,28 @@
+body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f2f2f2; /* Qlik Grisi */ color: #595959; }
+
+/* Top Bar */
+.top-bar { background-color: #fff; height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid #d9d9d9; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.logo { font-size: 1.2rem; font-weight: bold; color: #444; }
+.user-profile { font-size: 0.9rem; color: #777; }
+
+/* HUB GRID (Ekran Görüntüsündeki Yapı) */
+.hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; padding: 40px; max-width: 1400px; margin: 0 auto; }
+
+.app-card { background: white; border: 1px solid #d9d9d9; border-radius: 3px; height: 180px; cursor: pointer; transition: all 0.2s; position: relative; display: flex; flex-direction: column; }
+.app-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateY(-2px); border-color: #65b84d; /* Qlik Yeşili */ }
+
+.card-icon { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #555; background: #f9f9f9; }
+.card-footer { height: 50px; padding: 10px; border-top: 1px solid #eee; background: #fff; }
+.app-title { font-weight: bold; font-size: 0.95rem; display: block; color: #333; }
+.app-desc { font-size: 0.75rem; color: #999; margin-top: 3px; }
+
+/* Analiz Ekranı Stilleri */
+.analysis-container { padding: 20px; }
+.toolbar { background: #fff; padding: 15px; margin-bottom: 20px; border-radius: 4px; display: flex; justify-content: space-between; border: 1px solid #ddd; }
+.grid-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.chart-box { background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 4px; height: 400px; }
+.btn-back { background: #444; color: #fff; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-size: 0.9rem; }
+
+/* Sağ Üst Profil Alanı İçin Dropdown */
+.user-profile { cursor: pointer; }
+.user-profile:hover { text-decoration: underline; }

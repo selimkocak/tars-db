@@ -7,14 +7,19 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-roaring = "0.10"
-ahash = "0.8"
+# Roaring'e "serde" yeteneği ekliyoruz (Kritik!)
+roaring = { version = "0.10", features = ["serde"] }
+
+# Serileştirme Kütüphaneleri
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+
+ahash = { version = "0.8", features = ["serde"] }
 rand = "0.8"
 wasm-bindgen = "0.2"
 web-sys = { version = "0.3", features = ["console"] }
 js-sys = "0.3"
+csv = "1.3"
+
 getrandom = { version = "0.2", features = ["js"] }
 getrandom_v3 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
-
-# YENİ: CSV Okuma Motoru
-csv = "1.3"
