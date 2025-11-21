@@ -12,8 +12,9 @@ ahash = "0.8"
 rand = "0.8"
 wasm-bindgen = "0.2"
 web-sys = { version = "0.3", features = ["console"] }
-js-sys = "0.3" # <-- İşte eksik olan parça bu!
-
-# --- TARAYICI UYUMLULUĞU İÇİN ---
+js-sys = "0.3"
 getrandom = { version = "0.2", features = ["js"] }
 getrandom_v3 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+# YENİ: CSV Okuma Motoru
+csv = "1.3"

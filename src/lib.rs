@@ -2,8 +2,9 @@ use wasm_bindgen::prelude::*;
 use roaring::RoaringBitmap;
 use ahash::AHashMap;
 use rand::Rng;
+use std::io::Cursor; // String'i dosya gibi okumak için
 
-// --- COLUMN YAPISI ---
+// --- COLUMN YAPISI (Değişmedi) ---
 struct Column {
     symbol_table: AHashMap<String, u32>,
     reverse_symbol: Vec<String>,
@@ -59,6 +60,7 @@ impl TarsEngine {
         }
     }
 
+    // --- ESKİ RASTGELE DATA (Hala dursun test için) ---
     pub fn load_random_data(&mut self, count: u32) {
         let cities = vec!["Istanbul", "Ankara", "Izmir", "Antalya", "Bursa", "Trabzon", "Gaziantep", "Konya", "Adana", "Diyarbakir"];
         let depts = vec!["IT", "IK", "Satis", "Finans", "Lojistik", "Uretim", "ArGe", "Yonetim"];
@@ -75,6 +77,51 @@ impl TarsEngine {
         }
     }
 
+    // --- YENİ: CSV YÜKLEME MOTORU ---
+    pub fn load_csv_data(&mut self, content: &str) -> String {
+        // CSV Okuyucuyu Başlat
+        let mut rdr = csv::ReaderBuilder::new()
+            .has_headers(true) // İlk satır başlık mı? Evet.
+            .from_reader(Cursor::new(content));
+
+        // Başlıkları (Header) Al: "City", "Department", "Year" vb.
+        let headers = match rdr.headers() {
+            Ok(h) => h.clone(),
+            Err(_) => return "Hata: CSV başlıkları okunamadı".to_string(),
+        };
+
+        // Kolon İsimlerini Vektöre Al
+        let mut col_names: Vec<String> = headers.iter().map(|h| h.to_string()).collect();
+        
+        let start_count = self.row_count;
+
+        // Satırları Dön
+        for result in rdr.records() {
+            let record = match result {
+                Ok(r) => r,
+                Err(_) => continue, // Hatalı satırı atla
+            };
+
+            let row_id = self.row_count;
+
+            // Her hücreyi ilgili kolona ekle
+            for (i, field_value) in record.iter().enumerate() {
+                if i < col_names.len() {
+                    let col_name = &col_names[i];
+                    self.columns
+                        .entry(col_name.clone())
+                        .or_insert_with(Column::new)
+                        .insert(field_value, row_id);
+                }
+            }
+            self.row_count += 1;
+        }
+
+        let loaded = self.row_count - start_count;
+        format!("CSV Yüklendi: {} satır, {} kolon.", loaded, col_names.len())
+    }
+
+    // --- SORGULAR ---
     pub fn toggle_selection(&mut self, field: &str, value: &str) -> String {
         if let Some(f) = &self.selected_field {
             if f == field && self.selected_value.as_deref() == Some(value) {
@@ -84,7 +131,6 @@ impl TarsEngine {
                 return "Seçim Kaldırıldı".to_string();
             }
         }
-
         let col = self.columns.get(field).unwrap();
         if let Some(&sym_id) = col.symbol_table.get(value) {
             self.current_selection = Some(col.bitmaps[sym_id as usize].clone());
@@ -98,20 +144,25 @@ impl TarsEngine {
     pub fn query_count(&self, field: &str, value: &str) -> u32 {
         let col = match self.columns.get(field) { Some(c) => c, None => return 0 };
         let field_bitmap = match col.symbol_table.get(value) { Some(&id) => &col.bitmaps[id as usize], None => return 0 };
-
         match &self.current_selection {
             Some(sel) => (field_bitmap & sel).len() as u32,
             None => field_bitmap.len() as u32,
         }
     }
+
+    pub fn query_global_count(&self, field: &str, value: &str) -> u32 {
+        if let Some(col) = self.columns.get(field) {
+            if let Some(&symbol_id) = col.symbol_table.get(value) {
+                return col.bitmaps[symbol_id as usize].len() as u32;
+            }
+        }
+        0
+    }
     
     pub fn get_state(&self, field: &str, value: &str) -> u8 {
         if let Some(sel_f) = &self.selected_field {
-            if sel_f == field && self.selected_value.as_deref() == Some(value) {
-                return 2;
-            }
+            if sel_f == field && self.selected_value.as_deref() == Some(value) { return 2; }
         }
-
         match &self.current_selection {
             None => 1, 
             Some(sel) => {
@@ -127,17 +178,24 @@ impl TarsEngine {
     pub fn get_total_filtered(&self) -> u32 {
         match &self.current_selection { Some(s) => s.len() as u32, None => self.row_count }
     }
-
-    // DÜZELTME BURADA: Bu fonksiyon artık 'impl' bloğunun İÇİNDE.
-    pub fn query_global_count(&self, field: &str, value: &str) -> u32 {
-        if let Some(col) = self.columns.get(field) {
-            if let Some(&symbol_id) = col.symbol_table.get(value) {
-                return col.bitmaps[symbol_id as usize].len() as u32;
-            }
-        }
-        0
+    
+    // Arayüze "Hangi Kolonlar Var?" bilgisini vermek için
+    pub fn get_column_names(&self) -> String {
+        let keys: Vec<String> = self.columns.keys().cloned().collect();
+        keys.join(",")
     }
-} // <--- KAPANIŞ PARANTEZİ BURADA OLMALI
+    
+    // Bir kolonun içindeki ilk 20 distinct değeri getir (Grafik çizmek için)
+    pub fn get_top_values(&self, field: &str) -> String {
+         if let Some(col) = self.columns.get(field) {
+             // Sadece ilk 15 değeri alalım şimdilik
+             let values: Vec<String> = col.reverse_symbol.iter().take(15).cloned().collect();
+             values.join(",")
+         } else {
+             "".to_string()
+         }
+    }
+}
 
 mod console_error_panic_hook {
     use std::panic;
