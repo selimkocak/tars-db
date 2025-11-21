@@ -1,0 +1,1 @@
+sudo chmod +x /var/www/TarsDbProject/tars_db/scripts/git.sh

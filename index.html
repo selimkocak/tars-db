@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>TarsDB - True Associative</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { background: linear-gradient(90deg, #00d4ff, #00ff9d); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
+        .control-bar { background: #1e1e1e; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin: 20px 0; border: 1px solid #333; }
+        button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:disabled { background: #333; color: #555; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: #1e1e1e; padding: 15px; border-radius: 12px; border: 1px solid #333; height: 350px; }
+        
+        /* Metrikler */
+        .metric-val { font-size: 1.5rem; font-weight: bold; text-align: right; }
+        .metric-lbl { font-size: 0.8rem; color: #888; text-align: right; }
+        
+        #status { color: #00ff9d; margin-left: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 TarsDB v1.2 (True Associative)</h1>
+            <div style="color:#666; font-size:0.9rem">Green (Selected) / White (Possible) / Gray (Alternative)</div>
+        </header>
+
+        <div class="control-bar">
+            <div>
+                <button id="btnLoad">💾 1 Milyon Veri Yükle</button>
+                <span id="status"></span>
+            </div>
+            <div>
+                <div class="metric-val" id="totalRows">0</div>
+                <div class="metric-lbl">SEÇİLİ SATIR</div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card"><canvas id="chartCity"></canvas></div>
+            <div class="card"><canvas id="chartDept"></canvas></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { TarsEngine } from './pkg/tars_db.js';
+
+        let db = null;
+        let chartCity, chartDept;
+        const cities = ["Istanbul", "Ankara", "Izmir", "Antalya", "Bursa", "Trabzon", "Gaziantep", "Konya", "Adana", "Diyarbakir"];
+        const depts = ["IT", "IK", "Satis", "Finans", "Lojistik", "Uretim", "ArGe", "Yonetim"];
+
+        const COLOR_GREEN = '#00c853';  
+        const COLOR_CYAN  = '#00d4ff';  
+        const COLOR_GRAY  = '#444444'; // Biraz daha görünür bir gri
+
+        async function run() {
+            await init();
+            db = new TarsEngine();
+            initCharts();
+
+            document.getElementById('btnLoad').onclick = function() {
+                this.innerText = "Yükleniyor...";
+                setTimeout(() => {
+                    db.load_random_data(1000000);
+                    this.innerText = "✅ Hazır";
+                    this.disabled = true;
+                    updateDashboard();
+                }, 50);
+            };
+        }
+
+        function initCharts() {
+            const commonOpt = (field) => ({
+                responsive: true, maintainAspectRatio: false,
+                onClick: (e, el) => handleClick(field, el),
+                plugins: { legend: { display: false } },
+                scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#333' } } }
+            });
+
+            chartCity = new Chart(document.getElementById('chartCity'), {
+                type: 'bar',
+                data: { labels: cities, datasets: [{ data: [], backgroundColor: [], borderRadius: 4 }] },
+                options: { ...commonOpt("City"), plugins: { title: { display: true, text: 'Şehirler', color: '#fff' }, legend: {display:false} } }
+            });
+
+            chartDept = new Chart(document.getElementById('chartDept'), {
+                type: 'bar',
+                data: { labels: depts, datasets: [{ data: [], backgroundColor: [], borderRadius: 4 }] },
+                options: { ...commonOpt("Department"), plugins: { title: { display: true, text: 'Departmanlar', color: '#fff' }, legend: {display:false} } }
+            });
+        }
+
+        function handleClick(field, elements) {
+            if (elements.length === 0) return;
+            const idx = elements[0].index;
+            const value = field === "City" ? cities[idx] : depts[idx];
+            
+            const msg = db.toggle_selection(field, value);
+            document.getElementById('status').innerText = "| " + msg;
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            // 1. Şehir Grafiğini Güncelle
+            const cityData = [];
+            const cityColors = [];
+            
+            cities.forEach(city => {
+                const state = db.get_state("City", city);
+                
+                if (state === 0) { // GRİ (EXCLUDED)
+                    // Qlik Mantığı: Gri olanlar kaybolmaz, toplam boyunu gösterir ama gri renkte olur.
+                    cityData.push(db.query_global_count("City", city)); 
+                    cityColors.push(COLOR_GRAY);
+                } else {
+                    // YEŞİL veya MAVİ
+                    cityData.push(db.query_count("City", city));
+                    cityColors.push(state === 2 ? COLOR_GREEN : COLOR_CYAN);
+                }
+            });
+
+            // 2. Departman Grafiğini Güncelle
+            const deptData = [];
+            const deptColors = [];
+
+            depts.forEach(dept => {
+                const state = db.get_state("Department", dept);
+                
+                if (state === 0) { // GRİ
+                    deptData.push(db.query_global_count("Department", dept));
+                    deptColors.push(COLOR_GRAY);
+                } else {
+                    deptData.push(db.query_count("Department", dept));
+                    deptColors.push(state === 2 ? COLOR_GREEN : COLOR_CYAN);
+                }
+            });
+
+            chartCity.data.datasets[0].data = cityData;
+            chartCity.data.datasets[0].backgroundColor = cityColors;
+            chartCity.update();
+
+            chartDept.data.datasets[0].data = deptData;
+            chartDept.data.datasets[0].backgroundColor = deptColors;
+            chartDept.update();
+
+            document.getElementById('totalRows').innerText = db.get_total_filtered().toLocaleString();
+        }
+
+        run();
+    </script>
+</body>
+</html>
