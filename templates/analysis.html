@@ -1,13 +1,29 @@
 <div class="analysis-container">
+    <div id="loader" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loaderMsg">Veriler İşleniyor...</div>
+    </div>
+
+    <div id="toastContainer"></div>
+
     <div class="toolbar">
-        <a href="#hub" class="btn-back"><i class="fa-solid fa-arrow-left"></i> Hub'a Dön</a>
+        <a href="#hub" class="btn-back"><i class="fa-solid fa-arrow-left"></i> Hub</a>
         
-        <div id="dropZone" style="border: 2px dashed #ccc; padding: 10px 30px; cursor: pointer; text-align: center;">
-            <span style="color:#666">📂 Excel/CSV Sürükle & Bırak</span>
-            <input type="file" id="fileInput" accept=".csv, .xlsx" style="display:none">
+        <div style="display:flex; gap:10px; margin-left:10px;">
+            <button id="btnSave" class="btn-action" style="background:#2980b9; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">
+                <i class="fa-solid fa-floppy-disk"></i> Kaydet (.tars)
+            </button>
+            <button id="btnClear" class="btn-action" style="background:#e74c3c; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">
+                <i class="fa-solid fa-filter-circle-xmark"></i> Temizle
+            </button>
         </div>
 
-        <div style="text-align: right;">
+        <div id="dropZone" style="border: 2px dashed #ccc; padding: 10px 30px; cursor: pointer; text-align: center; margin-left: auto;">
+            <span style="color:#666">📂 Excel / CSV / .tars Yükle</span>
+            <input type="file" id="fileInput" accept=".csv, .xlsx, .tars" style="display:none">
+        </div>
+
+        <div style="text-align: right; margin-left: 20px;">
             <div style="font-size: 1.5rem; font-weight: bold; color: #333;" id="totalRows">0</div>
             <div style="font-size: 0.7rem; color: #888;">KAYIT SAYISI</div>
         </div>

@@ -5,33 +5,29 @@ use ahash::AHashMap;
 use rand::Rng;
 use std::io::Cursor;
 use serde::{Serialize, Deserialize};
-use crate::column::Column; // Diğer dosyayı çağırıyoruz!
+use crate::column::Column; 
 
 #[derive(Serialize, Deserialize)]
 #[wasm_bindgen]
 pub struct TarsEngine {
-    pub(crate) columns: AHashMap<String, Column>, // pub(crate): Sadece bu proje içinden erişilebilir
+    pub(crate) columns: AHashMap<String, Column>,
     pub(crate) row_count: u32,
     
+    // DEĞİŞİKLİK 1: Tek seçim yerine, Field Bazlı Bitmap Haritası
+    // #[serde(skip)] ile diske kaydederken bu geçici seçimleri yoksayıyoruz.
     #[serde(skip)]
-    current_selection: Option<RoaringBitmap>,
-    #[serde(skip)]
-    selected_field: Option<String>,
-    #[serde(skip)]
-    selected_value: Option<String>,
+    selections: AHashMap<String, RoaringBitmap>,
 }
 
 #[wasm_bindgen]
 impl TarsEngine {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        crate::utils::set_panic_hook(); // Utils dosyasını çağırıyoruz
+        crate::utils::set_panic_hook();
         Self {
             columns: AHashMap::new(),
             row_count: 0,
-            current_selection: None,
-            selected_field: None,
-            selected_value: None,
+            selections: AHashMap::new(), // Yeni yapı başlatılıyor
         }
     }
 
@@ -78,36 +74,117 @@ impl TarsEngine {
 
     pub fn import_db(data: &[u8]) -> TarsEngine {
         let mut engine: TarsEngine = bincode::deserialize(data).expect("Dosya bozuk");
-        engine.current_selection = None;
-        engine.selected_field = None;
-        engine.selected_value = None;
+        // Import ederken seçimleri sıfırla
+        engine.selections = AHashMap::new();
         engine
     }
 
-    // --- QUERY LOGIC ---
-    pub fn toggle_selection(&mut self, field: &str, value: &str) -> String {
-        if let Some(f) = &self.selected_field {
-            if f == field && self.selected_value.as_deref() == Some(value) {
-                self.current_selection = None; self.selected_field = None; self.selected_value = None;
-                return "Seçim Kaldırıldı".to_string();
+    // --- QUERY LOGIC (MULTI-SELECT CORE) ---
+    
+    // Yardımcı Fonksiyon: Belirli bir alan hariç diğer tüm alanların kesişimini (AND) al.
+    // Bu, "White/Possible" alanını hesaplamak için kritiktir.
+    fn get_combined_filter(&self, exclude_field: Option<&str>) -> Option<RoaringBitmap> {
+        let mut iter = self.selections.iter();
+        
+        // İlk geçerli bitmap'i bul
+        let mut result_bitmap: Option<RoaringBitmap> = None;
+
+        for (field, bitmap) in iter {
+            // Eğer exclude_field verilmişse, o alanı hesaplamaya katma
+            if let Some(ex) = exclude_field {
+                if field == ex { continue; }
+            }
+
+            match result_bitmap {
+                None => result_bitmap = Some(bitmap.clone()),
+                Some(ref mut res) => *res &= bitmap, // AND işlemi
             }
         }
-        let col = self.columns.get(field).unwrap();
-        if let Some(&sym_id) = col.symbol_table.get(value) {
-            self.current_selection = Some(col.bitmaps[sym_id as usize].clone());
-            self.selected_field = Some(field.to_string());
-            self.selected_value = Some(value.to_string());
-            return format!("{} = {}", field, value);
-        }
-        "Hata".to_string()
+        result_bitmap
     }
 
+    // Seçim Yap / Kaldır (Toggle)
+    pub fn toggle_selection(&mut self, field: &str, value: &str) -> String {
+        let col = match self.columns.get(field) {
+            Some(c) => c,
+            None => return "Hata: Kolon bulunamadı".to_string(),
+        };
+
+        if let Some(&sym_id) = col.symbol_table.get(value) {
+            let val_bitmap = &col.bitmaps[sym_id as usize];
+            
+            // Bu alan için zaten bir seçim listesi var mı? Yoksa oluştur.
+            let selection = self.selections.entry(field.to_string()).or_insert_with(RoaringBitmap::new);
+            
+            // XOR İşlemi: Varsa çıkarır, Yoksa ekler.
+            *selection ^= val_bitmap;
+
+            // Eğer bu alanda hiç seçim kalmadıysa, map'ten sil (Performans için önemli)
+            if selection.is_empty() {
+                self.selections.remove(field);
+                return format!("Seçim temizlendi: {}", field);
+            }
+            
+            return format!("{} güncellendi", field);
+        }
+        "Hata: Değer bulunamadı".to_string()
+    }
+
+    // Bir değerin durumunu hesapla: 2=Yeşil (Selected), 1=Mavi/Beyaz (Possible), 0=Gri (Excluded)
+    pub fn get_state(&self, field: &str, value: &str) -> u8 {
+        let col = self.columns.get(field).unwrap();
+        
+        // Sembol yoksa direkt gri
+        let sym_id = match col.symbol_table.get(value) {
+            Some(&id) => id,
+            None => return 0,
+        };
+        let val_bitmap = &col.bitmaps[sym_id as usize];
+
+        // 1. DURUM: SELECTED (Yeşil)
+        // Eğer bu alan 'selections' içinde varsa ve bu değer o bitmap'in içindeyse
+        if let Some(sel_bitmap) = self.selections.get(field) {
+            // intersection_len > 0 yerine !is_disjoint daha hızlıdır
+            // Ancak tam eşleşme kontrolü için: Bu değer, seçim setinin bir parçası mı?
+            // Qlik mantığında: Seçili kümenin içinde bu değerin satırları var mı? Evet.
+            // Ama buradaki 'sel_bitmap' birden fazla değerin birleşimi (OR).
+            // O yüzden kesişim kontrolü yeterli: Eğer kesişiyorsa bu değer SEÇİLMİŞTİR.
+            if !sel_bitmap.is_disjoint(val_bitmap) {
+                return 2; // YEŞİL
+            }
+        }
+
+        // 2. DURUM: EXCLUDED vs POSSIBLE
+        // Bu alan HARİÇ diğer tüm filtrelerin kesişimini al (Global Context)
+        let other_filters = self.get_combined_filter(Some(field));
+
+        match other_filters {
+            None => 1, // Hiçbir dış filtre yoksa her şey mümkündür (BEYAZ/MAVİ)
+            Some(global_filter) => {
+                if !global_filter.is_disjoint(val_bitmap) {
+                    1 // Kesişim var -> POSSIBLE (BEYAZ/MAVİ)
+                } else {
+                    0 // Kesişim yok -> EXCLUDED (GRİ)
+                }
+            }
+        }
+    }
+
+    // Seçimlere göre bir değerin kaç satır içerdiğini hesapla
     pub fn query_count(&self, field: &str, value: &str) -> u32 {
         let col = match self.columns.get(field) { Some(c) => c, None => return 0 };
         let field_bitmap = match col.symbol_table.get(value) { Some(&id) => &col.bitmaps[id as usize], None => return 0 };
-        match &self.current_selection { Some(sel) => (field_bitmap & sel).len() as u32, None => field_bitmap.len() as u32 }
+        
+        // Tüm aktif filtreleri (bu alan dahil) birleştir
+        let all_filters = self.get_combined_filter(None); // None -> Hiçbir alanı hariç tutma
+
+        match all_filters {
+            Some(filter) => (field_bitmap & &filter).len() as u32,
+            None => field_bitmap.len() as u32
+        }
     }
 
+    // Global (seçimden bağımsız) o değerin toplam satır sayısı (Gri renkli barların tam boyu için)
     pub fn query_global_count(&self, field: &str, value: &str) -> u32 {
         if let Some(col) = self.columns.get(field) {
             if let Some(&symbol_id) = col.symbol_table.get(value) {
@@ -117,24 +194,13 @@ impl TarsEngine {
         0
     }
 
-    pub fn get_state(&self, field: &str, value: &str) -> u8 {
-        if let Some(sel_f) = &self.selected_field {
-            if sel_f == field && self.selected_value.as_deref() == Some(value) { return 2; }
-        }
-        match &self.current_selection {
-            None => 1, 
-            Some(sel) => {
-                let col = self.columns.get(field).unwrap();
-                if let Some(&sym_id) = col.symbol_table.get(value) {
-                    let field_bitmap = &col.bitmaps[sym_id as usize];
-                    if !field_bitmap.is_disjoint(sel) { 1 } else { 0 }
-                } else { 0 }
-            }
-        }
-    }
-
+    // Toplam filtrelenmiş satır sayısı (Üstteki sayaç için)
     pub fn get_total_filtered(&self) -> u32 {
-        match &self.current_selection { Some(s) => s.len() as u32, None => self.row_count }
+        // Tüm filtrelerin kesişimi
+        match self.get_combined_filter(None) {
+            Some(filter) => filter.len() as u32,
+            None => self.row_count // Filtre yoksa tüm satırlar
+        }
     }
 
     pub fn get_column_names(&self) -> String {

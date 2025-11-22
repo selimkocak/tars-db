@@ -1,171 +1,103 @@
+// tars_db/js/app.js
 import init, { TarsEngine } from '../pkg/tars_db.js';
-
-// Global Değişkenler (Modül Kapsamında)
-let db = null;
-let chart1 = null, chart2 = null;
-let activeCol1 = null, activeCol2 = null;
-
-// Renkler
-const C_GREEN = '#4caf50';
-const C_GRAY  = '#bfbfbf';
-const C_BLUE  = '#3498db';
+import { AppState } from './state.js';
+import { UI } from './ui.js';
+import { Storage } from './storage.js';
+import { ChartManager } from './charts.js';
+import { FileManager } from './files.js';
 
 // --- MOTORU BAŞLATMA ---
-// Bu fonksiyonu Router çağıracak
 export async function initApp() {
-    // Eğer motor zaten yüklüyse tekrar yükleme (Singleton Pattern)
-    if (!db) {
-        console.log("⚙️ TarsDB Motoru Yükleniyor...");
-        await init();
-        db = new TarsEngine();
-        console.log("✅ TarsDB Hazır!");
+    if (!AppState.db) {
+        await init(); // WASM yükle
+        
+        UI.showLoading("Önceki oturum kontrol ediliyor...");
+        try {
+            const savedData = await Storage.load();
+            if (savedData) {
+                AppState.setDB(TarsEngine.import_db(savedData));
+                UI.showToast("🔄 Önceki oturum yüklendi!", "info");
+            } else {
+                AppState.setDB(new TarsEngine());
+                UI.showToast("✅ TarsDB Hazır", "success");
+            }
+        } catch (err) {
+            console.error("DB Init Hatası:", err);
+            AppState.setDB(new TarsEngine());
+        } finally {
+            UI.hideLoading();
+        }
     }
-
-    // HTML elementlerini bağla
     initUI();
 }
 
-// --- ARAYÜZ BAĞLANTILARI ---
+// --- UI BAĞLANTILARI ---
 function initUI() {
     const ctx1 = document.getElementById('chart1');
     const ctx2 = document.getElementById('chart2');
 
     if (ctx1 && ctx2) {
-        // Grafikleri Kur
-        initCharts(ctx1, ctx2);
+        // Grafikleri Başlat
+        ChartManager.init(ctx1, ctx2, ChartManager.update);
+        refreshUI();
 
-        // Dosya Yükleme
+        // Dosya Yükleme Olayları
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
-        
         if(dropZone && fileInput) {
             dropZone.onclick = () => fileInput.click();
-            fileInput.onchange = handleFile;
+            fileInput.onchange = (e) => FileManager.handleFile(e, refreshUI);
+            
+            dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = '#3498db'; };
+            dropZone.ondragleave = (e) => { e.preventDefault(); dropZone.style.borderColor = '#ccc'; };
+            dropZone.ondrop = (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = '#ccc';
+                if(e.dataTransfer.files.length > 0) {
+                    fileInput.files = e.dataTransfer.files;
+                    FileManager.handleFile({target: fileInput}, refreshUI);
+                }
+            };
         }
 
         // Dropdownlar
-        document.getElementById('sel1').addEventListener('change', (e) => { 
-            activeCol1 = e.target.value; updateDashboard(); 
-        });
-        document.getElementById('sel2').addEventListener('change', (e) => { 
-            activeCol2 = e.target.value; updateDashboard(); 
-        });
-    }
-}
-
-// --- DOSYA İŞLEMLERİ ---
-function handleFile(evt) {
-    const file = evt.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const data = e.target.result;
+        document.getElementById('sel1').addEventListener('change', (e) => { AppState.activeCol1 = e.target.value; ChartManager.update(); });
+        document.getElementById('sel2').addEventListener('change', (e) => { AppState.activeCol2 = e.target.value; ChartManager.update(); });
         
-        // Excel ise CSV'ye çevir
-        if (file.name.endsWith('.xlsx')) {
-            const wb = XLSX.read(data, {type: 'binary'});
-            const csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
-            db.load_csv_data(csv);
-        } else {
-            db.load_csv_data(data);
+        // Butonlar
+        const btnSave = document.getElementById('btnSave');
+        const btnClear = document.getElementById('btnClear');
+        
+        if(btnSave) {
+            btnSave.innerHTML = '<i class="fa-solid fa-download"></i> Yedek İndir';
+            btnSave.onclick = FileManager.saveProjectToFile; 
         }
         
-        // Arayüzü Tazele
-        refreshUI();
-    };
-
-    if (file.name.endsWith('.xlsx')) reader.readAsBinaryString(file); 
-    else reader.readAsText(file);
-}
-
-// --- MENÜ GÜNCELLEME ---
-function refreshUI() {
-    const cols = db.get_column_names().split(',').filter(c => c.trim() !== "");
-    populateSelect('sel1', cols);
-    populateSelect('sel2', cols);
-    
-    // Varsayılan Seçimler
-    if (cols.length >= 2) {
-        activeCol1 = cols[0];
-        activeCol2 = cols[1];
-        document.getElementById('sel1').value = activeCol1;
-        document.getElementById('sel2').value = activeCol2;
-        updateDashboard();
-    }
-}
-
-function populateSelect(id, opts) {
-    const el = document.getElementById(id);
-    el.innerHTML = "";
-    opts.forEach(o => { 
-        const op = document.createElement("option"); 
-        op.text = o; 
-        el.add(op); 
-    });
-}
-
-// --- GRAFİK KURULUMU ---
-function initCharts(ctx1, ctx2) {
-    const conf = (getCol) => ({
-        type: 'bar', 
-        data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
-        options: {
-            responsive: true, 
-            maintainAspectRatio: false,
-            onClick: (e, el) => {
-                if(el.length > 0) {
-                    const idx = el[0].index;
-                    const chart = (e.chart.canvas.id === 'chart1') ? chart1 : chart2;
-                    const col = (e.chart.canvas.id === 'chart1') ? activeCol1 : activeCol2;
-                    
-                    const val = chart.data.labels[idx];
-                    db.toggle_selection(col, val); // Motor Çağrısı
-                    updateDashboard();
-                }
-            },
-            plugins: { legend: {display:false}, title: {display:true, text:'-'} },
-            scales: { x: {grid:{display:false}}, y: {beginAtZero:true} }
-        }
-    });
-
-    chart1 = new Chart(ctx1, conf(() => activeCol1));
-    chart2 = new Chart(ctx2, conf(() => activeCol2));
-}
-
-// --- DASHBOARD GÜNCELLEME (Render Loop) ---
-function updateDashboard() {
-    if(!activeCol1 || !activeCol2) return;
-    
-    const render = (chart, col) => {
-        chart.options.plugins.title.text = col;
-        
-        // Veriyi Çek
-        const labels = db.get_top_values(col).split(',').filter(s => s);
-        const data = []; 
-        const colors = [];
-        
-        labels.forEach(val => {
-            const state = db.get_state(col, val);
-            if (state === 0) { 
-                // GRİ (Excluded - Global Count)
-                data.push(db.query_global_count(col, val)); 
-                colors.push(C_GRAY); 
-            } else { 
-                // YEŞİL/MAVİ (Selected/Possible)
-                data.push(db.query_count(col, val)); 
-                colors.push(state === 2 ? C_GREEN : C_BLUE);
+        if(btnClear) btnClear.onclick = () => {
+            if(AppState.db) { 
+                AppState.db.clear_all_selections();
+                ChartManager.update();
+                UI.showToast("Filtreler Temizlendi", "info");
             }
-        });
+        };
+    }
+}
 
-        chart.data.labels = labels;
-        chart.data.datasets[0].data = data;
-        chart.data.datasets[0].backgroundColor = colors;
-        chart.update();
-    };
+// --- ARAYÜZ GÜNCELLEME ---
+function refreshUI() {
+    if (!AppState.db || AppState.db.get_total_filtered() === 0) return;
+
+    const cols = AppState.db.get_column_names().split(',').filter(c => c.trim() !== "");
     
-    render(chart1, activeCol1);
-    render(chart2, activeCol2);
+    // State güncelle
+    if (cols.length >= 2) {
+        if(!AppState.activeCol1 || !cols.includes(AppState.activeCol1)) AppState.activeCol1 = cols[0]; 
+        if(!AppState.activeCol2 || !cols.includes(AppState.activeCol2)) AppState.activeCol2 = cols[1];
+    }
+
+    // Dropdownları Doldur
+    UI.populateSelect('sel1', cols, AppState.activeCol1);
+    UI.populateSelect('sel2', cols, AppState.activeCol2);
     
-    document.getElementById('totalRows').innerText = db.get_total_filtered().toLocaleString();
+    ChartManager.update();
 }
