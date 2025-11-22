@@ -32,10 +32,24 @@ impl TarsEngine {
                     let val_a = &col.reverse_symbol[col.data[a as usize] as usize];
                     let val_b = &col.reverse_symbol[col.data[b as usize] as usize];
                     
-                    if let (Ok(na), Ok(nb)) = (val_a.parse::<f64>(), val_b.parse::<f64>()) {
-                        if sort_desc { nb.partial_cmp(&na).unwrap() } else { na.partial_cmp(&nb).unwrap() }
-                    } else {
-                        if sort_desc { val_b.cmp(val_a) } else { val_a.cmp(val_b) }
+                    // Tip Kontrolü ile Hızlı Sıralama
+                    match col.col_type {
+                        crate::column::DataType::Integer => {
+                            let na = val_a.parse::<i64>().unwrap_or(0);
+                            let nb = val_b.parse::<i64>().unwrap_or(0);
+                            if sort_desc { nb.cmp(&na) } else { na.cmp(&nb) }
+                        },
+                        crate::column::DataType::Float => {
+                            // Virgül/Nokta fix
+                            let fa = val_a.replace(',', ".").parse::<f64>().unwrap_or(0.0);
+                            let fb = val_b.replace(',', ".").parse::<f64>().unwrap_or(0.0);
+                            if sort_desc { fb.partial_cmp(&fa).unwrap_or(std::cmp::Ordering::Equal) } 
+                            else { fa.partial_cmp(&fb).unwrap_or(std::cmp::Ordering::Equal) }
+                        },
+                        // Diğerleri (String, Date, Bool) alfabetik
+                        _ => {
+                            if sort_desc { val_b.cmp(val_a) } else { val_a.cmp(val_b) }
+                        }
                     }
                 });
             }

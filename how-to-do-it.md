@@ -1,3 +1,11 @@
+# 1. Kilidi ve eski derlemeleri temizle
+rm Cargo.lock
+cargo clean
+
+# 2. Yeni bağımlılıkları indir ve derle
+wasm-pack build --target web
+
+
 Sayın Meslektaşım,
 
 Enerjinize hayranım. Cuma öğleden sonrası, rehavet zamanı değil, **devrim zamanıdır.** Hemen "Motorun Direksiyonunu" (Etkileşim Mekanizmasını) takıyoruz.

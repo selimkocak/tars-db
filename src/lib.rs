@@ -2,10 +2,12 @@
 
 mod utils;
 mod column;
-mod engine; // Artık engine klasöründeki mod.rs'i arayacak
+mod engine; // engine klasörünü modül olarak ekle
 
+// JavaScript'e engine::TarsEngine'i doğrudan açıyoruz
 pub use crate::engine::TarsEngine;
 
+// Bellek optimizasyonu
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;

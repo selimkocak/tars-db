@@ -1,24 +1,39 @@
-// tars_db/src/column.rs
+// src/column.rs
+
 use roaring::RoaringBitmap;
-use ahash::AHashMap;
+use std::collections::HashMap; // AHashMap yerine bunu kullanıyoruz
 use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Copy)]
+pub enum DataType {
+    Null, Utf8, Boolean, Integer, Float, Date, DateTime, Time, Currency, Percentage, Email, Phone, Url, IpAddress,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct Column {
-    pub symbol_table: AHashMap<String, u32>,
+    pub symbol_table: HashMap<String, u32>, // HashMap oldu
     pub reverse_symbol: Vec<String>,
     pub data: Vec<u32>,
     pub bitmaps: Vec<RoaringBitmap>,
+    pub col_type: DataType,
+    pub type_confidence: f32, 
 }
 
 impl Column {
     pub fn new() -> Self {
         Self {
-            symbol_table: AHashMap::new(),
+            symbol_table: HashMap::new(), // HashMap::new()
             reverse_symbol: Vec::new(),
             data: Vec::new(),
             bitmaps: Vec::new(),
+            col_type: DataType::Utf8,
+            type_confidence: 0.0,
         }
+    }
+    
+    pub fn set_type(&mut self, t: DataType, confidence: f32) {
+        self.col_type = t;
+        self.type_confidence = confidence;
     }
 
     pub fn insert(&mut self, value: &str, row_id: u32) {

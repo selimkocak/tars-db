@@ -1,3 +1,41 @@
+# 🚀 TarsDB Sense v2.0 "Quantum Matrix"
+
+Dünyanın en hızlı, açık kaynak, sunucusuz (local-first) ve **akıllı** İş Zekası (BI) motoru.
+
+## 🔥 Neden TarsDB?
+
+| Özellik | Qlik Sense | TarsDB Sense |
+|---------|------------|--------------|
+| **Motor** | Associative (QIX) | Associative (Tars/WASM) |
+| **Hız** | Çok Hızlı | **Ultra Hızlı (Rust)** |
+| **Veri Tipi** | Otomatik (Temel) | **Kuantum Matrisi (Gelişmiş)** |
+| **Gizlilik** | Bulut / Sunucu | **%100 Yerel (Tarayıcı)** |
+| **Maliyet** | $$$ Lisans | **Ücretsiz & Açık Kaynak** |
+
+## 🧠 Quantum Matrix Teknolojisi
+
+TarsDB, verinizi yüklediğiniz anda analiz eder ve tipini "koklar":
+* ✅ **Otomatik Tarih Algılama:** `2025-01-01`, `01.01.2025`
+* ✅ **Para Birimi:** `₺1.250,00`, `$100`
+* ✅ **İletişim Bilgileri:** E-posta, TR Telefon Numaraları (`+90...`)
+* ✅ **Teknik:** IP Adresleri, JSON nesneleri
+
+## 📦 Kurulum
+
+1. Repo'yu klonlayın.
+2. `python3 -m http.server 8080` (veya herhangi bir web sunucusu).
+3. Tarayıcıda `localhost:8080` adresine gidin.
+4. Excel/CSV dosyanızı sürükleyin ve analize başlayın.
+
+---
+*Designed by Prof. Dr. Tars All & Built with Rust 🦀*
+
+
+
+
+
+
+#####
 # 🚀 TarsDB: In-Memory Associative Engine (WASM)
 
 > **The world's first open-source, client-side associative engine powered by Rust & WebAssembly.**
