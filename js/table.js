@@ -1,19 +1,17 @@
 // tars_db/js/table.js
 
 import { AppState } from './state.js';
-import { ChartManager } from './charts.js'; // Seçim yapınca grafikleri güncellemek için
 
 export const TableManager = {
     currentSort: null,
     isDesc: false,
     visibleColumns: [],
     currentPage: 0,
-    pageSize: 50, // Her seferinde 50 satır göster (Scroll ile artacak)
+    pageSize: 50, 
 
     init() {
         if(!AppState.db) return;
         
-        // Varsayılan kolonlar (Eğer yoksa)
         if (this.visibleColumns.length === 0) {
             const allCols = AppState.db.get_column_names().split(',').filter(s=>s);
             this.visibleColumns = allCols.slice(0, 5);
@@ -21,14 +19,13 @@ export const TableManager = {
 
         this.renderHeader();
         this.update();
-        this.setupScroll(); // Sonsuz kaydırma dinleyicisi
+        this.setupScroll(); 
     },
 
     setupScroll() {
         const container = document.querySelector('.table-container');
         if(container) {
             container.onscroll = () => {
-                // Scroll sonuna yaklaştı mı?
                 if (container.scrollTop + container.clientHeight >= container.scrollHeight - 50) {
                     this.loadMore();
                 }
@@ -37,8 +34,8 @@ export const TableManager = {
     },
 
     loadMore() {
-        this.pageSize += 50; // Limiti artır
-        this.update(true);   // Append mode (tabloyu silmeden ekle)
+        this.pageSize += 50; 
+        this.update(true);   
     },
 
     renderHeader() {
@@ -66,33 +63,27 @@ export const TableManager = {
             this.currentSort = col;
             this.isDesc = false;
         }
-        this.pageSize = 50; // Sıralama değişince başa dön
+        this.pageSize = 50; 
         this.renderHeader();
         this.update();
     },
 
-    // Hücre Tıklama (Seçim)
     selectCell(col, val) {
         if(AppState.db) {
             AppState.db.toggle_selection(col, val);
-            // Tüm dashboard'u güncelle (ChartManager veya app.js üzerinden updateDashboard çağrılmalı)
-            // Burada global bir event veya callback kullanabiliriz.
-            // Pratik çözüm:
             window.updateDashboardGlobal(); 
         }
     },
 
+    // --- GÜNCELLENEN KISIM ---
     update(append = false) {
         if (!AppState.db) return;
         
         const colsStr = this.visibleColumns.join(',');
         
-        // Rust'tan veriyi çek (Offset: 0, Limit: pageSize)
-        // Virtual Scroll'un basit versiyonu: "Load More". 
-        // Daha gelişmişi için "Windowing" gerekir ama şimdilik bu yeterli.
         const jsonStr = AppState.db.get_table_data(
             colsStr, 
-            0, // Hep baştan çek ama limit artıyor
+            0, 
             this.pageSize, 
             this.currentSort, 
             this.isDesc
@@ -102,17 +93,36 @@ export const TableManager = {
         const tbody = document.getElementById('gridBody');
         if(!tbody) return;
 
-        // HTML String oluştur
         const html = data.map(row => {
             let tr = '<tr>';
             this.visibleColumns.forEach(col => {
                 let val = row[col];
-                // Sayısal format (Lokalizasyon)
-                if(!isNaN(parseFloat(val))) val = AppState.loc.Num(val);
                 
-                // Tıklanabilir Hücre
-                // Değerin kendisini tırnak içine alarak fonksiyona gönderiyoruz
-                tr += `<td onclick="TableManager.selectCell('${col}', '${row[col].replace(/'/g, "\\'")}')" class="selectable-cell">${val}</td>`;
+                // --- AKILLI FORMATLAMA ---
+                // 1. Sayı mı?
+                if (!isNaN(parseFloat(val)) && isFinite(val)) {
+                    // Ama belki tarihtir? (Excel Serial Date: 20000 - 60000 arası)
+                    // Kolon adında "Tarih" veya "Date" geçiyorsa ve değer o aralıktaysa
+                    const isDateCol = col.toLowerCase().includes('tarih') || col.toLowerCase().includes('date');
+                    const numVal = parseFloat(val);
+
+                    if (isDateCol && numVal > 20000 && numVal < 60000) {
+                        // Tarih olarak formatla
+                        val = AppState.loc.formatDate(numVal);
+                    } else {
+                        // Normal sayı olarak formatla
+                        val = AppState.loc.Num(val);
+                    }
+                } 
+                // 2. ISO Tarih String mi? (2025-11-22)
+                else if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) {
+                     val = AppState.loc.formatDate(val);
+                }
+
+                // Kaçış karakterlerini temizle
+                const safeVal = row[col].replace(/'/g, "\\'");
+                
+                tr += `<td onclick="TableManager.selectCell('${col}', '${safeVal}')" class="selectable-cell">${val}</td>`;
             });
             tr += '</tr>';
             return tr;
@@ -126,5 +136,4 @@ export const TableManager = {
     }
 };
 
-// Global Erişim
 window.TableManager = TableManager;
